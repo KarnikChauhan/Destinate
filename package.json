@@ -4,7 +4,9 @@
   "description": "<p align=\"center\">     <img src=\"./assets/lurkr.png\" width=100>     <img src=\"./assets/mee6.png\" width=100>     <h3 align=\"center\">The Mee6 and Lurkr Leveling system clone</h3> </p>",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && node ."
+    "dev": "tsc && node .",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "TFAGaming",
