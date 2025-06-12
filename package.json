@@ -1,0 +1,27 @@
+{
+  "name": "netlevel",
+  "version": "1.0.0",
+  "description": "<p align=\"center\">     <img src=\"./assets/lurkr.png\" width=100>     <img src=\"./assets/mee6.png\" width=100>     <h3 align=\"center\">The Mee6 and Lurkr Leveling system clone</h3> </p>",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && node ."
+  },
+  "keywords": [],
+  "author": "TFAGaming",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.44",
+    "@prisma/client": "^5.22.0",
+    "axios": "^1.8.4",
+    "chalk": "^2.4.2",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@discordjs/util": "^1.1.1",
+    "@types/uuid": "^9.0.8",
+    "prisma": "^5.22.0",
+    "undici": "^7.7.0"
+  }
+}
