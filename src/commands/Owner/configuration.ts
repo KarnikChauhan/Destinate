@@ -1,4 +1,4 @@
-import { AttachmentBuilder } from "discord.js";
+import { AttachmentBuilder, PermissionsBitField } from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 import util from 'util';
@@ -11,17 +11,24 @@ export default new NetLevelBotCommand({
         options: [],
         dm_permission: false
     },
-    options: {
-        guildOwnerOnly: true
-    },
     callback: async (client, interaction) => {
 
-        if (!interaction.guild) return;
+        if (!interaction.guild || !interaction.member) return;
+
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+        if (!isOwner && !isAdmin) {
+            await interaction.reply({
+                content: '❌ You must be the server owner or have administrator permissions to use this command.',
+                ephemeral: true
+            });
+            return;
+        }
 
         await interaction.deferReply().catch(null);
 
         try {
-
             const data = await client.prisma.guild.findFirst({
                 where: {
                     guildId: interaction.guild.id
