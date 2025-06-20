@@ -1,7 +1,7 @@
 import { AttachmentBuilder, PermissionsBitField } from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
-import util from 'util';
+import util from "util";
 
 export default new NetLevelBotCommand({
     type: 1,
@@ -12,11 +12,16 @@ export default new NetLevelBotCommand({
         dm_permission: false
     },
     callback: async (client, interaction) => {
-
         if (!interaction.guild || !interaction.member) return;
 
+        // Safe permission check: allow owner or admin
         const isOwner = interaction.guild.ownerId === interaction.user.id;
-        const isAdmin = new PermissionsBitField(interaction.member.permissions).has(PermissionsBitField.Flags.Administrator);
+
+        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
+            ? interaction.member.permissions
+            : new PermissionsBitField(interaction.member.permissions || 0n);
+
+        const isAdmin = memberPerms.has(PermissionsBitField.Flags.Administrator);
 
         if (!isOwner && !isAdmin) {
             await interaction.reply({
@@ -26,7 +31,7 @@ export default new NetLevelBotCommand({
             return;
         }
 
-        await interaction.deferReply().catch(null);
+        await interaction.deferReply().catch(() => null);
 
         try {
             const data = await client.prisma.guild.findFirst({
@@ -38,8 +43,7 @@ export default new NetLevelBotCommand({
             if (!data) {
                 await interaction.followUp({
                     content: 'The server hasn\'t been configured yet.'
-                }).catch(null);
-
+                }).catch(() => null);
                 return;
             }
 
@@ -49,20 +53,21 @@ export default new NetLevelBotCommand({
                 }
             });
 
-            const objString = `guild: ${util.inspect(data)},\nroles: ${roles.length <= 0 ? '[]' : util.inspect(roles)}`
+            const objString = `guild: ${util.inspect(data)},\nroles: ${roles.length <= 0 ? '[]' : util.inspect(roles)}`;
 
             const stringified = JSON.stringify(objString);
 
             await interaction.followUp({
                 content: 'Here is the data saved for your server:',
                 files: [
-                    new AttachmentBuilder(Buffer.from(JSON.parse(stringified), 'utf-8'), { name: 'data-' + interaction.guild.id + '.coffee' })
+                    new AttachmentBuilder(Buffer.from(JSON.parse(stringified), 'utf-8'), {
+                        name: `data-${interaction.guild.id}.coffee`
+                    })
                 ]
-            }).catch(null);
+            }).catch(() => null);
 
         } catch (err) {
             new InteractionError(interaction, err);
         }
-
     }
 });
