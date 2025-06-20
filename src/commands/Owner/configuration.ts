@@ -14,14 +14,12 @@ export default new NetLevelBotCommand({
     callback: async (client, interaction) => {
         if (!interaction.guild || !interaction.member) return;
 
-        // Safe permission check: allow owner or admin
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
-        const rawPerms = interaction.member.permissions;
         const memberPerms = new PermissionsBitField(
-            typeof rawPerms === 'bigint' || typeof rawPerms === 'number'
-                ? rawPerms
-                : rawPerms?.bitfield ?? 0n
+            typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
+                ? BigInt(interaction.member.permissions)
+                : interaction.member.permissions ?? 0n
         );
 
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
@@ -30,7 +28,7 @@ export default new NetLevelBotCommand({
             await interaction.reply({
                 content: '❌ You must be the server owner or have administrator permissions to use this command.',
                 ephemeral: true
-            }).catch(() => null);
+            });
             return;
         }
 
@@ -57,13 +55,12 @@ export default new NetLevelBotCommand({
             });
 
             const objString = `guild: ${util.inspect(data)},\nroles: ${roles.length <= 0 ? '[]' : util.inspect(roles)}`;
-
-            const buffer = Buffer.from(objString, 'utf-8');
+            const stringified = JSON.stringify(objString);
 
             await interaction.followUp({
                 content: 'Here is the data saved for your server:',
                 files: [
-                    new AttachmentBuilder(buffer, {
+                    new AttachmentBuilder(Buffer.from(JSON.parse(stringified), 'utf-8'), {
                         name: `data-${interaction.guild.id}.coffee`
                     })
                 ]
