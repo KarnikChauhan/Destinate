@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField } from "discord.js";
+import {
+    ApplicationCommandOptionType,
+    PermissionFlagsBits,
+    PermissionsBitField
+} from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 
@@ -24,7 +28,7 @@ export default new NetLevelBotCommand({
                         description: 'The amount of XP to give.',
                         type: ApplicationCommandOptionType.Integer,
                         min_value: 1,
-                        max_value: 100000000,
+                        max_value: 100_000_000,
                         required: true
                     }
                 ]
@@ -39,11 +43,10 @@ export default new NetLevelBotCommand({
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
         const memberPerms = new PermissionsBitField(
-    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
-        ? BigInt(interaction.member.permissions)
-        : interaction.member.permissions ?? 0n
-);
-
+            typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
+                ? BigInt(interaction.member.permissions)
+                : interaction.member.permissions?.bitfield ?? 0n
+        );
 
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
@@ -51,23 +54,24 @@ export default new NetLevelBotCommand({
             await interaction.reply({
                 content: '❌ You must be the server owner or have administrator permissions to use this command.',
                 ephemeral: true
-            }).catch(null);
+            }).catch(() => null);
             return;
         }
 
         const user = interaction.options.getUser('user', true);
         const amount = interaction.options.getInteger('amount', true);
 
-        await interaction.deferReply().catch(null);
+        if (user.bot) {
+            await interaction.reply({
+                content: '❌ You cannot give XP to bots.',
+                ephemeral: true
+            }).catch(() => null);
+            return;
+        }
+
+        await interaction.deferReply().catch(() => null);
 
         try {
-            if (user.bot) {
-                await interaction.followUp({
-                    content: user.toString() + ' is a bot.'
-                }).catch(null);
-                return;
-            }
-
             const data = await client.prisma.user.findFirst({
                 where: {
                     guildId: interaction.guild.id,
@@ -76,9 +80,9 @@ export default new NetLevelBotCommand({
             });
 
             if (!data) {
-                await interaction.followUp({
-                    content: 'The user must send at least one message in any channel.'
-                }).catch(null);
+                await interaction.editReply({
+                    content: '⚠️ The user must send at least one message in any channel before receiving XP.'
+                }).catch(() => null);
                 return;
             }
 
@@ -86,6 +90,7 @@ export default new NetLevelBotCommand({
             let newLevel = data.level;
             let requiredXP = data.levelXp;
 
+            // Level up logic
             while (newTotalXP >= requiredXP) {
                 newLevel++;
                 requiredXP = 5 * (newLevel ** 2) + 50 * newLevel + 100;
@@ -106,9 +111,9 @@ export default new NetLevelBotCommand({
                 }
             });
 
-            await interaction.followUp({
-                content: `Successfully added **${amount}** XP to ${user.toString()}, now they're at level **${newLevel}**.`
-            }).catch(null);
+            await interaction.editReply({
+                content: `✅ Successfully added **${amount} XP** to ${user.toString()}.\nThey are now at level **${newLevel}**.`
+            }).catch(() => null);
 
         } catch (err) {
             new InteractionError(interaction, err);
