@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField } from "discord.js";
+import {
+    ApplicationCommandOptionType,
+    PermissionFlagsBits,
+    PermissionsBitField
+} from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { fetchMee6Leaderboard, wait } from "../../util/functions";
 
@@ -10,7 +14,7 @@ export default new NetLevelBotCommand({
         options: [
             {
                 name: 'limit',
-                description: 'The limit of pages to import.',
+                description: 'The number of pages to import (1 page = 1000 users).',
                 type: ApplicationCommandOptionType.Integer,
                 max_value: 50,
                 min_value: 1,
@@ -18,7 +22,7 @@ export default new NetLevelBotCommand({
             },
             {
                 name: 'guild',
-                description: 'The custom guild ID to import.',
+                description: 'Custom guild ID to import from.',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -29,106 +33,101 @@ export default new NetLevelBotCommand({
     callback: async (client, interaction) => {
         if (!interaction.guild || !interaction.member) return;
 
-        // Permission check for owner or admin
         const isOwner = interaction.guild.ownerId === interaction.user.id;
         const memberPerms = new PermissionsBitField(
-    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
-        ? BigInt(interaction.member.permissions)
-        : interaction.member.permissions ?? 0n
-);
-
+            typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
+                ? BigInt(interaction.member.permissions)
+                : interaction.member.permissions ?? 0n
+        );
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
         if (!isOwner && !isAdmin) {
             await interaction.reply({
                 content: '❌ You must be the server owner or have administrator permissions to use this command.',
                 ephemeral: true
-            }).catch(null);
+            }).catch(() => null);
             return;
         }
 
         const limit = interaction.options.getInteger('limit', true);
-        const guildId = interaction.options.getString('guild') || interaction.guild.id;
+        const targetGuildId = interaction.options.getString('guild') || interaction.guild.id;
 
-        await interaction.deferReply().catch(null);
+        await interaction.deferReply().catch(() => null);
 
         try {
-            await interaction.followUp({
-                content: 'Importing from Mee6 database... (**0%**)',
-            }).catch(null);
+            await interaction.editReply({
+                content: '⏳ Importing from Mee6 database... (**0%**)',
+            }).catch(() => null);
 
             let page = 0;
-            const arr: {
-                messageCount: number,
-                id: string,
-                xp: { userXp: number, levelXp: number, totalXp: number },
-                level: number,
-                rank: number
+            const importedUsers: {
+                messageCount: number;
+                id: string;
+                xp: { userXp: number; levelXp: number; totalXp: number };
+                level: number;
+                rank: number;
             }[] = [];
 
-            while (true) {
-                if (page >= limit) break;
-
-                const res = await fetchMee6Leaderboard(guildId, 'limit=1000&page=' + page);
+            while (page < limit) {
+                const res = await fetchMee6Leaderboard(targetGuildId, `limit=1000&page=${page}`);
                 const players = res.data?.players;
 
-                if (!players || players.length === 0) break;
+                if (!Array.isArray(players) || players.length === 0) break;
 
-                players.forEach((user: any, index: number) => {
+                for (let i = 0; i < players.length; i++) {
+                    const user = players[i];
                     const { id, level, message_count: messageCount } = user;
                     const [userXp, levelXp, totalXp] = user.detailed_xp;
 
-                    arr.push({
+                    importedUsers.push({
                         messageCount,
                         id,
                         xp: { userXp, levelXp, totalXp },
                         level,
-                        rank: (page * 1000) + index + 1
+                        rank: page * 1000 + i + 1
                     });
-                });
+                }
 
                 page++;
 
                 await interaction.editReply({
-                    content: `Importing from Mee6 database... (**${(((page) / limit) * 100).toFixed(1)}%**)`
-                }).catch(null);
+                    content: `⏳ Importing from Mee6 database... (**${((page / limit) * 100).toFixed(1)}%**)`
+                }).catch(() => null);
 
                 await wait(5000); // Delay to avoid API rate limit
             }
 
             await interaction.editReply({
-                content: `Successfully imported **${arr.length}** user's XP, saving into the database...`
-            }).catch(null);
+                content: `💾 Saving **${importedUsers.length}** users' XP into the database...`
+            }).catch(() => null);
 
             await client.prisma.user.deleteMany({
-                where: {
-                    guildId: interaction.guild.id
-                }
+                where: { guildId: interaction.guild.id }
             });
 
-            for (const each of arr) {
+            for (const user of importedUsers) {
                 await client.prisma.user.create({
                     data: {
                         guildId: interaction.guild.id,
-                        level: each.level,
-                        levelXp: each.xp.levelXp,
-                        totalXp: each.xp.totalXp,
-                        xp: each.xp.userXp,
-                        messageCount: each.messageCount,
-                        rank: each.rank,
-                        userId: each.id
+                        userId: user.id,
+                        level: user.level,
+                        levelXp: user.xp.levelXp,
+                        totalXp: user.xp.totalXp,
+                        xp: user.xp.userXp,
+                        messageCount: user.messageCount,
+                        rank: user.rank
                     }
                 });
             }
 
             await interaction.editReply({
-                content: `Successfully saved **${arr.length}** user's XP into the database.`
-            }).catch(null);
+                content: `✅ Successfully saved **${importedUsers.length}** users' XP to the database.`
+            }).catch(() => null);
 
         } catch (err) {
             await interaction.editReply({
-                content: `❌ Unable to import from the bot's API. Please make sure the leaderboard is public, Mee6 API is not down, and you're not being rate-limited.`
-            }).catch(null);
+                content: `❌ Failed to import from Mee6. Make sure:\n• The leaderboard is public\n• You're not being rate-limited\n• The Mee6 API is not down.`
+            }).catch(() => null);
         }
     }
 });
