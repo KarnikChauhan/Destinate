@@ -1,4 +1,4 @@
-import { AttachmentBuilder, PermissionsBitField } from "discord.js";
+import { AttachmentBuilder, PermissionsBitField, PermissionFlagsBits } from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 import util from "util";
@@ -17,17 +17,20 @@ export default new NetLevelBotCommand({
         // Safe permission check: allow owner or admin
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
-        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
-            ? interaction.member.permissions
-            : new PermissionsBitField(interaction.member.permissions || 0n);
+        const rawPerms = interaction.member.permissions;
+        const memberPerms = new PermissionsBitField(
+            typeof rawPerms === 'bigint' || typeof rawPerms === 'number'
+                ? rawPerms
+                : rawPerms?.bitfield ?? 0n
+        );
 
-        const isAdmin = memberPerms.has(PermissionsBitField.Flags.Administrator);
+        const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
         if (!isOwner && !isAdmin) {
             await interaction.reply({
                 content: '❌ You must be the server owner or have administrator permissions to use this command.',
                 ephemeral: true
-            });
+            }).catch(() => null);
             return;
         }
 
@@ -55,12 +58,12 @@ export default new NetLevelBotCommand({
 
             const objString = `guild: ${util.inspect(data)},\nroles: ${roles.length <= 0 ? '[]' : util.inspect(roles)}`;
 
-            const stringified = JSON.stringify(objString);
+            const buffer = Buffer.from(objString, 'utf-8');
 
             await interaction.followUp({
                 content: 'Here is the data saved for your server:',
                 files: [
-                    new AttachmentBuilder(Buffer.from(JSON.parse(stringified), 'utf-8'), {
+                    new AttachmentBuilder(buffer, {
                         name: `data-${interaction.guild.id}.coffee`
                     })
                 ]
