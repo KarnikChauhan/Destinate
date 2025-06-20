@@ -50,16 +50,16 @@ export default new NetLevelBotCommand({
             const buttons = [
                 new ButtonBuilder()
                     .setCustomId('yes-' + interaction.id)
-                    .setStyle(ButtonStyle.Danger)
+                    .setStyle(ButtonStyle.Primary)
                     .setLabel('Yes'),
                 new ButtonBuilder()
                     .setCustomId('no-' + interaction.id)
                     .setStyle(ButtonStyle.Secondary)
-                    .setLabel('No')
+                    .setLabel('No'),
             ];
 
             await interaction.editReply({
-                content: '⚠️ Are you sure you want to reset the bot to default for this server? This will erase **all** XP and configuration data.',
+                content: 'Are you sure that you want to reset the bot by default for this server? This will erase everything, including server config and user XP.',
                 components: [
                     new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)
                 ]
@@ -79,47 +79,28 @@ export default new NetLevelBotCommand({
                     return;
                 }
 
-                const [choice, id] = i.customId.split('-');
-                if (id !== interaction.id) return;
+                const split = i.customId.split('-');
+                if (split[1] !== interaction.id) return;
 
-                if (choice === 'yes') {
+                if (split[0] === 'yes') {
                     collector.stop();
+                    await i.deferReply();
 
-                    await i.deferReply().catch(null);
+                    const guildId = interaction.guild!.id; // ✅ use non-null assertion here
 
-                    await client.prisma.user.deleteMany({
-                        where: {
-                            guildId: interaction.guild.id
-                        }
-                    });
+                    await client.prisma.user.deleteMany({ where: { guildId } });
+                    await client.prisma.guild.deleteMany({ where: { guildId } });
+                    await client.prisma.role.deleteMany({ where: { guildId } });
 
-                    await client.prisma.guild.deleteMany({
-                        where: {
-                            guildId: interaction.guild.id
-                        }
-                    });
-
-                    await client.prisma.role.deleteMany({
-                        where: {
-                            guildId: interaction.guild.id
-                        }
-                    });
-
-                    await client.prisma.guild.create({
-                        data: {
-                            guildId: interaction.guild.id
-                        }
-                    });
+                    await client.prisma.guild.create({ data: { guildId } });
 
                     await i.editReply({
-                        content: '✅ The bot has been reset to default for this server.'
+                        content: '✅ The bot has been reset by default for the server.'
                     }).catch(null);
-                } else if (choice === 'no') {
+                } else if (split[0] === 'no') {
                     collector.stop();
-
                     await i.reply({
-                        content: '❎ Factory reset canceled.',
-                        ephemeral: true
+                        content: '❎ The request has been cancelled.'
                     }).catch(null);
                 }
             });
@@ -128,7 +109,9 @@ export default new NetLevelBotCommand({
                 await interaction.editReply({
                     components: [
                         new ActionRowBuilder<ButtonBuilder>().addComponents(
-                            buttons.map(btn => btn.setDisabled(true).setStyle(ButtonStyle.Secondary))
+                            buttons.map((button) =>
+                                button.setStyle(ButtonStyle.Secondary).setDisabled(true)
+                            )
                         )
                     ]
                 }).catch(null);
