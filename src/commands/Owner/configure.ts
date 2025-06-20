@@ -54,10 +54,25 @@ export default new NetLevelBotCommand({
         ],
         dm_permission: false
     },
-    options: {
-        guildOwnerOnly: true
-    },
+
     callback: async (client, interaction) => {
+                if (!interaction.guild || !interaction.member) return;
+
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+
+        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
+            ? interaction.member.permissions
+            : new PermissionsBitField(interaction.member.permissions || 0n);
+
+        const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
+
+        if (!isOwner && !isAdmin) {
+            await interaction.reply({
+                content: '❌ You must be the server owner or have administrator permissions to use this command.',
+                ephemeral: true
+            }).catch(null);
+            return;
+        }
 
         if (!interaction.guild) return;
 
