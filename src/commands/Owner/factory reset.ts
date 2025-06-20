@@ -29,9 +29,12 @@ export default new NetLevelBotCommand({
         // ✅ Admin or Owner check
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
-        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
-            ? interaction.member.permissions
-            : new PermissionsBitField(interaction.member.permissions || 0n);
+        const memberPerms = new PermissionsBitField(
+    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
+        ? BigInt(interaction.member.permissions)
+        : interaction.member.permissions ?? 0n
+);
+
 
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
