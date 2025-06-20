@@ -1,7 +1,14 @@
-import { ActionRowBuilder, ApplicationCommandOptionType, ButtonBuilder, ButtonStyle, ComponentType, PermissionFlagsBits } from "discord.js";
+import {
+    ActionRowBuilder,
+    ApplicationCommandOptionType,
+    ButtonBuilder,
+    ButtonStyle,
+    ComponentType,
+    PermissionFlagsBits,
+    PermissionsBitField
+} from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
-import { PermissionsBitField } from "discord.js";
 
 export default new NetLevelBotCommand({
     type: 1,
@@ -48,7 +55,7 @@ export default new NetLevelBotCommand({
             },
             {
                 name: 'reset',
-                description: 'Reset the levels plugin and it\'s configuration.',
+                description: 'Reset the levels plugin and its configuration.',
                 type: 1,
                 options: []
             }
@@ -57,16 +64,16 @@ export default new NetLevelBotCommand({
     },
 
     callback: async (client, interaction) => {
-                if (!interaction.guild || !interaction.member) return;
+        if (!interaction.guild || !interaction.member) return;
 
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
+        const rawPerms = interaction.member.permissions;
         const memberPerms = new PermissionsBitField(
-    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
-        ? BigInt(interaction.member.permissions)
-        : interaction.member.permissions ?? 0n
-);
-
+            typeof rawPerms === "string" || typeof rawPerms === "number"
+                ? BigInt(rawPerms)
+                : rawPerms?.bitfield ?? 0n
+        );
 
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
