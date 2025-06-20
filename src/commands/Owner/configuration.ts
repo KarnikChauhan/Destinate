@@ -16,7 +16,7 @@ export default new NetLevelBotCommand({
         if (!interaction.guild || !interaction.member) return;
 
         const isOwner = interaction.guild.ownerId === interaction.user.id;
-        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+        const isAdmin = new PermissionsBitField(interaction.member.permissions).has(PermissionsBitField.Flags.Administrator);
 
         if (!isOwner && !isAdmin) {
             await interaction.reply({
