@@ -11,7 +11,6 @@ export default new NetLevelBotCommand({
         dm_permission: false
     },
     callback: async (client, interaction) => {
-
         if (!interaction.guild) return;
 
         await interaction.deferReply().catch(null);
@@ -20,31 +19,37 @@ export default new NetLevelBotCommand({
             const data = await client.prisma.user.findMany({
                 where: {
                     guildId: interaction.guild.id
-                },
-                orderBy: [
-                    { totalXp: 'desc' }, { level: 'desc' }
-                ]
+                }
             });
 
-            const mapped = data
-                .sort((a, b) => b.level - a.level)
-                .sort((a, b) => b.totalXp - a.totalXp)
-                .map((each, index) => {
-                    const user = client.users.cache.get(each.userId);
+            // Sort by total XP descending
+            const sorted = data.sort((a, b) => b.totalXp - a.totalXp);
 
-                    return `\`#${index + 1}\` ${user ? user.toString() : `<@${each.userId}>`}${user?.id === interaction.user.id ? ' (You)' : ''} - **Total XP**: ${formatNumber(each.totalXp)}, **Level**: ${each.level}`
-                })
-                .slice(0, 10);
+            // Map with ranks
+            const mapped = sorted.map((each, index) => {
+                const user = client.users.cache.get(each.userId);
+                return {
+                    rank: index + 1,
+                    userId: each.userId,
+                    level: each.level,
+                    totalXp: each.totalXp,
+                    userDisplay: user ? user.toString() : `<@${each.userId}>`,
+                    isSelf: each.userId === interaction.user.id
+                };
+            });
+
+            const top10 = mapped.slice(0, 10).map(entry =>
+                `\`#${entry.rank}\` ${entry.userDisplay}${entry.isSelf ? ' (You)' : ''} - **Total XP**: ${formatNumber(entry.totalXp)}, **Level**: ${entry.level}`
+            );
+
+            const selfEntry = mapped.find(entry => entry.userId === interaction.user.id);
 
             await interaction.followUp({
-                content: `The leaderboard of **${interaction.guild.name}**:\n\n${mapped.join('\n')}\n\nYou are currently at rank **#${data.filter((d) => d.userId === interaction.user.id)?.at(0)?.rank || '?'}**.`,
-                allowedMentions: {
-                    parse: []
-                }
+                content: `🏆 **Leaderboard of ${interaction.guild.name}**:\n\n${top10.join('\n')}\n\nYou are currently at rank **#${selfEntry?.rank || '?'}**.`,
+                allowedMentions: { parse: [] }
             }).catch(null);
         } catch (err) {
             new InteractionError(interaction, err);
         }
-
     }
 });
