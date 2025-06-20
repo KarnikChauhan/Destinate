@@ -6,6 +6,24 @@ import {
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 
+function calculateLevelFromXP(totalXp: number) {
+    let level = 0;
+    let requiredXp = 0;
+
+    while (true) {
+        requiredXp = 5 * (level ** 2) + 50 * level + 100;
+        if (totalXp < requiredXp) break;
+        totalXp -= requiredXp;
+        level++;
+    }
+
+    return {
+        level,
+        xpInLevel: totalXp,
+        requiredXp
+    };
+}
+
 export default new NetLevelBotCommand({
     type: 1,
     structure: {
@@ -87,16 +105,7 @@ export default new NetLevelBotCommand({
             }
 
             const newTotalXP = data.totalXp + amount;
-            let newLevel = data.level;
-            let requiredXP = data.levelXp;
-
-            // Level up logic
-            while (newTotalXP >= requiredXP) {
-                newLevel++;
-                requiredXP = 5 * (newLevel ** 2) + 50 * newLevel + 100;
-            }
-
-            const remainingXP = requiredXP - newTotalXP;
+            const { level, xpInLevel, requiredXp } = calculateLevelFromXP(newTotalXP);
 
             await client.prisma.user.updateMany({
                 where: {
@@ -104,15 +113,15 @@ export default new NetLevelBotCommand({
                     userId: user.id
                 },
                 data: {
-                    xp: remainingXP,
+                    xp: xpInLevel,
                     totalXp: newTotalXP,
-                    level: newLevel,
-                    levelXp: requiredXP
+                    level,
+                    levelXp: requiredXp
                 }
             });
 
             await interaction.editReply({
-                content: `✅ Successfully added **${amount} XP** to ${user.toString()}.\nThey are now at level **${newLevel}**.`
+                content: `✅ Successfully added **${amount} XP** to ${user.toString()}.\nThey are now at level **${level}**.`
             }).catch(() => null);
 
         } catch (err) {
