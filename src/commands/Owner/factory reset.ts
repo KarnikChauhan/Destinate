@@ -1,4 +1,11 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
+import {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ComponentType,
+    PermissionsBitField,
+    PermissionFlagsBits
+} from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 
@@ -16,12 +23,25 @@ export default new NetLevelBotCommand({
         ],
         dm_permission: false
     },
-    options: {
-        guildOwnerOnly: true
-    },
     callback: async (client, interaction) => {
+        if (!interaction.guild || !interaction.member) return;
 
-        if (!interaction.guild) return;
+        // ✅ Admin or Owner check
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+
+        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
+            ? interaction.member.permissions
+            : new PermissionsBitField(interaction.member.permissions || 0n);
+
+        const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
+
+        if (!isOwner && !isAdmin) {
+            await interaction.reply({
+                content: '❌ You must be the server owner or have administrator permissions to use this command.',
+                ephemeral: true
+            }).catch(() => null);
+            return;
+        }
 
         await interaction.deferReply().catch(null);
 
@@ -40,10 +60,7 @@ export default new NetLevelBotCommand({
             await interaction.editReply({
                 content: 'Are you sure that you want to reset the bot by default for this server? This command will erase everything, including the server configuration and users XP.',
                 components: [
-                    new ActionRowBuilder<ButtonBuilder>()
-                        .addComponents(
-                            buttons
-                        )
+                    new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)
                 ]
             }).catch(null);
 
@@ -58,12 +75,10 @@ export default new NetLevelBotCommand({
                         content: 'You are not the author of this interaction.',
                         ephemeral: true
                     }).catch(null);
-
                     return;
                 }
 
                 const split = i.customId.split('-');
-
                 if (split[1] !== interaction.id) return;
 
                 if (split[0] === 'yes') {
@@ -95,14 +110,13 @@ export default new NetLevelBotCommand({
                     });
 
                     await i.editReply({
-                        content: 'The bot has been reset by default for the server.'
+                        content: '✅ The bot has been reset by default for the server.'
                     }).catch(null);
-
                 } else if (split[0] === 'no') {
                     collector.stop();
 
                     await i.reply({
-                        content: 'The request has been cancelled.'
+                        content: '❎ The request has been cancelled.'
                     }).catch(null);
                 }
             });
@@ -110,14 +124,11 @@ export default new NetLevelBotCommand({
             collector?.on('end', async () => {
                 await interaction.editReply({
                     components: [
-                        new ActionRowBuilder<ButtonBuilder>()
-                            .addComponents(
-                                buttons.map((button) =>
-                                    button
-                                        .setStyle(ButtonStyle.Secondary)
-                                        .setDisabled(true)
-                                )
+                        new ActionRowBuilder<ButtonBuilder>().addComponents(
+                            buttons.map((button) =>
+                                button.setStyle(ButtonStyle.Secondary).setDisabled(true)
                             )
+                        )
                     ]
                 }).catch(null);
             });
@@ -125,6 +136,5 @@ export default new NetLevelBotCommand({
         } catch (err) {
             new InteractionError(interaction, err);
         }
-
     }
 });
