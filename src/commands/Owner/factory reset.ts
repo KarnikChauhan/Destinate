@@ -29,12 +29,12 @@ export default new NetLevelBotCommand({
         // ✅ Admin or Owner check
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
+        const rawPerms = interaction.member.permissions;
         const memberPerms = new PermissionsBitField(
-    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
-        ? BigInt(interaction.member.permissions)
-        : interaction.member.permissions ?? 0n
-);
-
+            typeof rawPerms === "string" || typeof rawPerms === "number"
+                ? BigInt(rawPerms)
+                : rawPerms?.bitfield ?? 0n
+        );
 
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
@@ -49,95 +49,13 @@ export default new NetLevelBotCommand({
         await interaction.deferReply().catch(null);
 
         try {
+            const yesId = `yes-${interaction.id}`;
+            const noId = `no-${interaction.id}`;
+
             const buttons = [
-                new ButtonBuilder()
-                    .setCustomId('yes-' + interaction.id)
-                    .setStyle(ButtonStyle.Primary)
-                    .setLabel('Yes'),
-                new ButtonBuilder()
-                    .setCustomId('no-' + interaction.id)
-                    .setStyle(ButtonStyle.Secondary)
-                    .setLabel('No'),
+                new ButtonBuilder().setCustomId(yesId).setStyle(ButtonStyle.Danger).setLabel('Yes'),
+                new ButtonBuilder().setCustomId(noId).setStyle(ButtonStyle.Secondary).setLabel('No')
             ];
 
             await interaction.editReply({
-                content: 'Are you sure that you want to reset the bot by default for this server? This command will erase everything, including the server configuration and users XP.',
-                components: [
-                    new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)
-                ]
-            }).catch(null);
-
-            const collector = interaction.channel?.createMessageComponentCollector({
-                componentType: ComponentType.Button,
-                time: 15000
-            });
-
-            collector?.on('collect', async (i) => {
-                if (i.user.id !== interaction.user.id) {
-                    await i.reply({
-                        content: 'You are not the author of this interaction.',
-                        ephemeral: true
-                    }).catch(null);
-                    return;
-                }
-
-                const split = i.customId.split('-');
-                if (split[1] !== interaction.id) return;
-
-                if (split[0] === 'yes') {
-                    collector.stop();
-
-                    await i.deferReply();
-
-                    await client.prisma.user.deleteMany({
-                        where: {
-                            guildId: interaction.guild?.id as string
-                        }
-                    });
-                    await client.prisma.guild.deleteMany({
-                        where: {
-                            guildId: interaction.guild?.id as string
-                        }
-                    });
-
-                    await client.prisma.guild.create({
-                        data: {
-                            guildId: interaction.guild?.id as string
-                        }
-                    });
-
-                    await client.prisma.role.deleteMany({
-                        where: {
-                            guildId: interaction.guild?.id as string
-                        }
-                    });
-
-                    await i.editReply({
-                        content: '✅ The bot has been reset by default for the server.'
-                    }).catch(null);
-                } else if (split[0] === 'no') {
-                    collector.stop();
-
-                    await i.reply({
-                        content: '❎ The request has been cancelled.'
-                    }).catch(null);
-                }
-            });
-
-            collector?.on('end', async () => {
-                await interaction.editReply({
-                    components: [
-                        new ActionRowBuilder<ButtonBuilder>().addComponents(
-                            buttons.map((button) =>
-                                button.setStyle(ButtonStyle.Secondary).setDisabled(true)
-                            )
-                        )
-                    ]
-                }).catch(null);
-            });
-
-        } catch (err) {
-            new InteractionError(interaction, err);
-        }
-    }
-});
+                content: '⚠️ Are you sure you want to fac
