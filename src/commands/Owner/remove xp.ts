@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField } from "discord.js";
+import {
+    ApplicationCommandOptionType,
+    PermissionFlagsBits,
+    PermissionsBitField
+} from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { InteractionError } from "../../util/classes";
 
@@ -15,7 +19,7 @@ export default new NetLevelBotCommand({
                 options: [
                     {
                         name: 'user',
-                        description: 'The user to remove XP.',
+                        description: 'The user to remove XP from.',
                         type: ApplicationCommandOptionType.User,
                         required: true
                     },
@@ -24,7 +28,7 @@ export default new NetLevelBotCommand({
                         description: 'The amount of XP to remove.',
                         type: ApplicationCommandOptionType.Integer,
                         min_value: 1,
-                        max_value: 100000000,
+                        max_value: 100_000_000,
                         required: true
                     }
                 ]
@@ -36,35 +40,33 @@ export default new NetLevelBotCommand({
     callback: async (client, interaction) => {
         if (!interaction.guild || !interaction.member) return;
 
+        // ✅ Permissions: Owner or Admin only
         const isOwner = interaction.guild.ownerId === interaction.user.id;
-
         const memberPerms = new PermissionsBitField(
-    typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
-        ? BigInt(interaction.member.permissions)
-        : interaction.member.permissions ?? 0n
-);
-
-
+            typeof interaction.member.permissions === "string" || typeof interaction.member.permissions === "number"
+                ? BigInt(interaction.member.permissions)
+                : interaction.member.permissions ?? 0n
+        );
         const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
 
         if (!isOwner && !isAdmin) {
             await interaction.reply({
                 content: '❌ You must be the server owner or have administrator permissions to use this command.',
                 ephemeral: true
-            }).catch(null);
+            }).catch(() => null);
             return;
         }
 
         const user = interaction.options.getUser('user', true);
         const amount = interaction.options.getInteger('amount', true);
 
-        await interaction.deferReply().catch(null);
+        await interaction.deferReply().catch(() => null);
 
         try {
             if (user.bot) {
                 await interaction.followUp({
-                    content: user.toString() + ' is a bot.'
-                }).catch(null);
+                    content: `${user} is a bot. XP actions are disabled for bots.`
+                }).catch(() => null);
                 return;
             }
 
@@ -77,8 +79,8 @@ export default new NetLevelBotCommand({
 
             if (!data) {
                 await interaction.followUp({
-                    content: 'The user must send at least one message in any channel.'
-                }).catch(null);
+                    content: `⚠️ ${user} hasn't sent any messages yet. No XP data available.`
+                }).catch(() => null);
                 return;
             }
 
@@ -108,8 +110,8 @@ export default new NetLevelBotCommand({
             });
 
             await interaction.followUp({
-                content: `Successfully removed **${amount}** XP from ${user.toString()}, now they're at level **${Math.max(newLevel, 0)}**.`
-            }).catch(null);
+                content: `✅ Successfully removed **${amount}** XP from ${user}.\n📉 New level: **${Math.max(newLevel, 0)}**`
+            }).catch(() => null);
 
         } catch (err) {
             new InteractionError(interaction, err);
