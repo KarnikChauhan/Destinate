@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType } from "discord.js";
+import { ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import { NetLevelBotCommand } from "../../class/Builders";
 import { fetchMee6Leaderboard, wait } from "../../util/functions";
 
@@ -19,15 +19,31 @@ export default new NetLevelBotCommand({
             {
                 name: 'guild',
                 description: 'The custom guild ID to import.',
-                type: 3,
+                type: ApplicationCommandOptionType.String,
                 required: false
             }
         ],
         dm_permission: false
     },
-    callback: async (client, interaction) => {
 
-        if (!interaction.guild) return;
+    callback: async (client, interaction) => {
+        if (!interaction.guild || !interaction.member) return;
+
+        // Permission check for owner or admin
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+        const memberPerms = interaction.member.permissions instanceof PermissionsBitField
+            ? interaction.member.permissions
+            : new PermissionsBitField(interaction.member.permissions || 0n);
+
+        const isAdmin = memberPerms.has(PermissionFlagsBits.Administrator);
+
+        if (!isOwner && !isAdmin) {
+            await interaction.reply({
+                content: '❌ You must be the server owner or have administrator permissions to use this command.',
+                ephemeral: true
+            }).catch(null);
+            return;
+        }
 
         const limit = interaction.options.getInteger('limit', true);
         const guildId = interaction.options.getString('guild') || interaction.guild.id;
@@ -35,23 +51,26 @@ export default new NetLevelBotCommand({
         await interaction.deferReply().catch(null);
 
         try {
-
             await interaction.followUp({
-                content: 'Importing from Mee6 database... (**0%**)'
+                content: 'Importing from Mee6 database... (**0%**)',
             }).catch(null);
 
             let page = 0;
-
-            const arr: { messageCount: number, id: string, xp: { userXp: number, levelXp: number, totalXp: number }, level: number, rank: number }[] = [];
+            const arr: {
+                messageCount: number,
+                id: string,
+                xp: { userXp: number, levelXp: number, totalXp: number },
+                level: number,
+                rank: number
+            }[] = [];
 
             while (true) {
                 if (page >= limit) break;
 
                 const res = await fetchMee6Leaderboard(guildId, 'limit=1000&page=' + page);
-
                 const players = res.data?.players;
 
-                if (players.length <= 0) break;
+                if (!players || players.length === 0) break;
 
                 players.forEach((user: any, index: number) => {
                     const { id, level, message_count: messageCount } = user;
@@ -62,7 +81,7 @@ export default new NetLevelBotCommand({
                         id,
                         xp: { userXp, levelXp, totalXp },
                         level,
-                        rank: (limit * page) + index + 1
+                        rank: (page * 1000) + index + 1
                     });
                 });
 
@@ -72,11 +91,11 @@ export default new NetLevelBotCommand({
                     content: `Importing from Mee6 database... (**${(((page) / limit) * 100).toFixed(1)}%**)`
                 }).catch(null);
 
-                await wait(5000);
+                await wait(5000); // Delay to avoid API rate limit
             }
 
             await interaction.editReply({
-                content: `Successfully imported **${arr.length}** user\'s XP, saving into the database...`
+                content: `Successfully imported **${arr.length}** user's XP, saving into the database...`
             }).catch(null);
 
             await client.prisma.user.deleteMany({
@@ -101,14 +120,13 @@ export default new NetLevelBotCommand({
             }
 
             await interaction.editReply({
-                content: `Successfully saved **${arr.length}** user\'s XP into the database.`
+                content: `Successfully saved **${arr.length}** user's XP into the database.`
             }).catch(null);
 
         } catch (err) {
             await interaction.editReply({
-                content: `Unable to import from the bot's API. Please make sure that I'm not rate-limited, the leaderboard is public, and the API isn't down.`
+                content: `❌ Unable to import from the bot's API. Please make sure the leaderboard is public, Mee6 API is not down, and you're not being rate-limited.`
             }).catch(null);
         }
-
     }
 });
